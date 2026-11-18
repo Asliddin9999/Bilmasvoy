@@ -6,7 +6,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+# Bir branch uchun faqat eng oxirgi yig‘ish jarayoni ishlaydi.
+concurrency:
+  group: bilmasvoy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -56,19 +61,33 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Send APK to Telegram
+      - name: Send APK to Telegram once per version
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.MrDeviceUZ_SenaristBotbilmasvoy }}
           TELEGRAM_CHAT_ID: '1888242683'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/^[[:space:]]*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read app version."
+            exit 1
+          fi
+          TAG="bilmasvoy-v${VERSION}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Version $VERSION was already delivered. Skipping duplicate Telegram send."
+            exit 0
+          fi
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "::error::Telegram secrets are missing. APK may build, but delivery cannot proceed."
+            echo "::error::Telegram secrets are missing."
             exit 1
           fi
           response=$(curl --fail --show-error --silent \
             --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             --form "chat_id=${TELEGRAM_CHAT_ID}" \
             --form "document=@app/build/outputs/apk/debug/app-debug.apk" \
-            --form "caption=Bilmasvoy 1.2 — jonli kamera orqali obyektlarni aniqlash")
+            --form "caption=Bilmasvoy ${VERSION} — o‘zbekcha interfeys va 80 turdagi narsani aniqlash")
           echo "$response" | jq -e '.ok == true' >/dev/null
-          echo "Telegram confirmed APK delivery."
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+          echo "Telegram confirmed the one-time delivery of version $VERSION."
