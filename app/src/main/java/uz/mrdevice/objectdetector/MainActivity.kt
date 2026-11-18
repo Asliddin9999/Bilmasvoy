@@ -413,7 +413,7 @@ class MainActivity : ComponentActivity() {
             runOnUiThread {
                 if (frameGeneration == cameraGeneration && screenIsActive && cameraStarted && !isFinishing && !isDestroyed) {
                     overlay.showDetections(sourceWidth, sourceHeight, detections)
-                    count.text = "Aniqlangan narsalar: ${detections.size} ta"
+                    count.text = detections.size.toString()
                     status.text = if (detections.isEmpty()) {
                         "Hozircha narsa topilmadi. Buyumni kameraga yaqinroq tuting."
                     } else {
@@ -529,7 +529,7 @@ class MainActivity : ComponentActivity() {
         cameraProvider?.unbindAll()
         objectAgentEngine.reset()
         if (::overlay.isInitialized) overlay.clearDetections()
-        if (::count.isInitialized) count.text = "Aniqlangan narsalar: 0 ta"
+        if (::count.isInitialized) count.text = "0"
     }
 
     override fun onResume() {
