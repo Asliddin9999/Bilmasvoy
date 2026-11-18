@@ -86,13 +86,14 @@ jobs:
           fi
 
           CAPTION="Bilmasvoy ${VERSION} — yangi APK yangilanishi. Dark Premium interfeys va barqaror AI obyekt kuzatuvi."
-          for CHAT_ID in "$TELEGRAM_PRIVATE_CHAT_ID" "$TELEGRAM_AGENTLAR_CHAT_ID"; do
-            response=$(curl --fail --show-error --silent \
+          for CHAT_ID in "$TELEGRAM_AGENTLAR_CHAT_ID"; do
+            response=$(curl --show-error --silent \
               --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
               --form "chat_id=${CHAT_ID}" \
               --form "document=@app/build/outputs/apk/debug/app-debug.apk" \
               --form "caption=${CAPTION}")
-            echo "$response" | jq -e '.ok == true' >/dev/null
+            echo "$response"
+            echo "$response" | jq -e '.ok == true' >/dev/null || exit 1
             echo "Telegram confirmed delivery to chat ${CHAT_ID}."
           done
 
