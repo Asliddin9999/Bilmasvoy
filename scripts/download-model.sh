@@ -2,8 +2,8 @@
 set -euo pipefail
 
 MODEL_DIR="app/src/main/assets"
-MODEL_PATH="$MODEL_DIR/efficientdet-lite0.tflite"
-MODEL_URL="https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/rpi/lite-model_efficientdet_lite0_detection_metadata_1.tflite"
+MODEL_PATH="$MODEL_DIR/efficientdet-lite2.tflite"
+MODEL_URL="https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/rpi/lite-model_efficientdet_lite2_detection_metadata_1.tflite"
 
 mkdir -p "$MODEL_DIR"
 curl --fail --location --retry 3 --retry-delay 2 --connect-timeout 20 "$MODEL_URL" --output "$MODEL_PATH"
