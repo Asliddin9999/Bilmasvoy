@@ -120,7 +120,7 @@ class ObjectAgentEngine {
             private const val REQUIRED_HITS = 2
             private const val MAX_CONFIRMATION_HITS = 3
             private const val MAX_MISSED_FRAMES = 2
-            private const val MAX_DISPLAY_HOLD_FRAMES = 1
+            private const val MAX_DISPLAY_HOLD_FRAMES = 0
             private const val MIN_ASSOCIATION_QUALITY = 0.18f
             private const val MIN_CENTER_DISTANCE_PX = 14f
             private const val MAX_CENTER_DISTANCE_RATIO = 0.35f
@@ -162,7 +162,7 @@ class ObjectAgentEngine {
 
     private fun thresholdFor(label: String): Float = when (label) {
         "remote", "mouse", "cell phone", "toothbrush", "hair drier", "scissors" -> 0.62f
-        else -> 0.52f
+        else -> 0.60f
     }
 
     companion object {
