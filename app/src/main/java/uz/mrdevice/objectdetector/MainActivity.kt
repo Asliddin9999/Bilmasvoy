@@ -51,6 +51,8 @@ class MainActivity : ComponentActivity() {
     @Volatile private var cameraStarted = false
     @Volatile private var cameraStarting = false
     @Volatile private var cameraGeneration = 0
+    private var previousDetections: List<Pair<RectF, String>> = emptyList()
+    private var missedDetectionFrames = 0
 
     private val cameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -140,8 +142,8 @@ class MainActivity : ComponentActivity() {
             var loadedModel: ObjectDetector? = null
             try {
                 val options = ObjectDetector.ObjectDetectorOptions.builder()
-                    .setScoreThreshold(0.40f)
-                    .setMaxResults(20)
+                    .setScoreThreshold(0.25f)
+                    .setMaxResults(30)
                     .build()
 
                 loadedModel = ObjectDetector.createFromFileAndOptions(
@@ -212,7 +214,7 @@ class MainActivity : ComponentActivity() {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 val analysis = ImageAnalysis.Builder()
-                    .setTargetResolution(Size(640, 480))
+                    .setTargetResolution(Size(960, 540))
                     .setTargetRotation(previewView.display?.rotation ?: android.view.Surface.ROTATION_0)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -266,7 +268,7 @@ class MainActivity : ComponentActivity() {
             }
 
             val results = activeDetector.detect(TensorImage.fromBitmap(orientedBitmap))
-            val detections = convertDetections(results)
+            val detections = stabilizeDetections(convertDetections(results))
             val sourceWidth = orientedBitmap.width
             val sourceHeight = orientedBitmap.height
 
@@ -294,6 +296,51 @@ class MainActivity : ComponentActivity() {
             if (originalBitmap != null && !originalBitmap.isRecycled) originalBitmap.recycle()
             imageProxy.close()
         }
+    }
+
+    // Kadrlar orasida bir xil narsani moslab, ramkani silliqlaydi va qisqa yo‘qolishlarda saqlab turadi.
+    private fun stabilizeDetections(current: List<Pair<RectF, String>>): List<Pair<RectF, String>> {
+        if (current.isEmpty()) {
+            missedDetectionFrames++
+            if (missedDetectionFrames <= 2) return previousDetections
+            previousDetections = emptyList()
+            return emptyList()
+        }
+
+        missedDetectionFrames = 0
+        val unmatchedPrevious = previousDetections.toMutableList()
+        val stabilized = current.map { (box, label) ->
+            val className = label.substringBefore(" — ")
+            val matchIndex = unmatchedPrevious.indices
+                .filter { unmatchedPrevious[it].second.substringBefore(" — ") == className }
+                .maxByOrNull { index -> intersectionOverUnion(box, unmatchedPrevious[index].first) }
+                ?.takeIf { intersectionOverUnion(box, unmatchedPrevious[it].first) >= 0.20f }
+
+            if (matchIndex == null) {
+                box to label
+            } else {
+                val old = unmatchedPrevious.removeAt(matchIndex).first
+                val smooth = RectF(
+                    old.left * 0.65f + box.left * 0.35f,
+                    old.top * 0.65f + box.top * 0.35f,
+                    old.right * 0.65f + box.right * 0.35f,
+                    old.bottom * 0.65f + box.bottom * 0.35f
+                )
+                smooth to label
+            }
+        }
+        previousDetections = stabilized
+        return stabilized
+    }
+
+    private fun intersectionOverUnion(a: RectF, b: RectF): Float {
+        val left = max(a.left, b.left)
+        val top = max(a.top, b.top)
+        val right = minOf(a.right, b.right)
+        val bottom = minOf(a.bottom, b.bottom)
+        val intersection = max(0f, right - left) * max(0f, bottom - top)
+        val union = a.width() * a.height() + b.width() * b.height() - intersection
+        return if (union > 0f) intersection / union else 0f
     }
 
     private fun convertDetections(results: List<Detection>): List<Pair<RectF, String>> {
@@ -395,6 +442,8 @@ class MainActivity : ComponentActivity() {
         cameraStarted = false
         cameraStarting = false
         cameraProvider?.unbindAll()
+        previousDetections = emptyList()
+        missedDetectionFrames = 0
         if (::overlay.isInitialized) overlay.clearDetections()
         if (::count.isInitialized) count.text = "Aniqlangan narsalar: 0 ta"
     }
