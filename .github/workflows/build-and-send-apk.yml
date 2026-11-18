@@ -2,7 +2,7 @@ name: Build Bilmasvoy APK and send to Telegram
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'fix/**' ]
   workflow_dispatch:
 
 permissions:
