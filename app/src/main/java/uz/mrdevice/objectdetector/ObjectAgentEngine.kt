@@ -27,9 +27,7 @@ class ObjectAgentEngine {
         var confirmed: Boolean = false
     )
 
-    private class ObjectAgent(
-        private val confidenceThreshold: Float
-    ) {
+    private class ObjectAgent {
         private val tracks = mutableListOf<Track>()
 
         fun update(candidates: List<Candidate>): List<Track> {
@@ -131,7 +129,7 @@ class ObjectAgentEngine {
     }
 
     private val agents: Map<String, ObjectAgent> = COCO_LABELS.associateWith { label ->
-        ObjectAgent(thresholdFor(label))
+        ObjectAgent()
     }
 
     @Synchronized
