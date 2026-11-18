@@ -240,6 +240,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun analyzeFrame(imageProxy: ImageProxy) {
+        val frameGeneration = cameraGeneration
         var originalBitmap: Bitmap? = null
         var rotatedBitmap: Bitmap? = null
         try {
@@ -266,13 +267,17 @@ class MainActivity : ComponentActivity() {
                 originalBitmap = null
             }
 
-            val detections = objectAgentEngine.update(activeDetector.detect(TensorImage.fromBitmap(orientedBitmap)))
+            val rawDetections = activeDetector.detect(TensorImage.fromBitmap(orientedBitmap))
+            // Kamera to'xtatilgan yoki qayta ishga tushgan eski kadrlar tracker holatini o'zgartirmasin.
+            if (frameGeneration != cameraGeneration || !cameraStarted || !screenIsActive) return
+
+            val detections = objectAgentEngine.update(rawDetections)
                 .map { it.boundingBox to "${uzbekObjectName(it.label)} — ${(it.score * 100).toInt()}%" }
             val sourceWidth = orientedBitmap.width
             val sourceHeight = orientedBitmap.height
 
             runOnUiThread {
-                if (screenIsActive && cameraStarted && !isFinishing && !isDestroyed) {
+                if (frameGeneration == cameraGeneration && screenIsActive && cameraStarted && !isFinishing && !isDestroyed) {
                     overlay.showDetections(sourceWidth, sourceHeight, detections)
                     count.text = "Aniqlangan narsalar: ${detections.size} ta"
                     status.text = if (detections.isEmpty()) {
