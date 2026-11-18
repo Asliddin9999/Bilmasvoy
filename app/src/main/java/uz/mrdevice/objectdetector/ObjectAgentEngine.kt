@@ -4,11 +4,11 @@ import android.graphics.RectF
 import org.tensorflow.lite.task.vision.detector.Detection
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sqrt
 
 /**
- * On-device multi-agent object tracker.
- * 80 ta COCO sinfi uchun 80 ta yengil sinf-agent ishlaydi.
- * Har bir agent faqat o'z sinfiga tegishli deteksiyalarni tasdiqlaydi va kuzatadi.
+ * On-device class-specialist tracker.
+ * Bitta TFLite model natijasini 80 ta COCO sinf agenti alohida filtrlab kuzatadi.
  */
 data class AgentDetection(
     val boundingBox: RectF,
@@ -36,27 +36,28 @@ class ObjectAgentEngine {
             val touched = mutableSetOf<Track>()
 
             candidates.sortedByDescending { it.score }.forEach { candidate ->
-                val match = tracks
+                val match = tracks.asSequence()
                     .filter { it !in touched }
-                    .map { track -> track to intersectionOverUnion(track.box, candidate.box) }
-                    .filter { it.second >= MATCH_IOU }
+                    .map { track -> track to associationQuality(track.box, candidate.box) }
+                    .filter { it.second >= MIN_ASSOCIATION_QUALITY }
                     .maxByOrNull { it.second }
                     ?.first
 
                 if (match != null) {
+                    // EMA: koordinata tebranishini yumshatadi, lekin harakatga tez moslashadi.
                     match.box = smooth(match.box, candidate.box)
-                    match.score = candidate.score
+                    match.score = match.score * 0.35f + candidate.score * 0.65f
                     match.hits = min(MAX_CONFIRMATION_HITS, match.hits + 1)
                     match.misses = 0
                     match.confirmed = match.hits >= REQUIRED_HITS
-                    touched += match
+                    touched.add(match)
                 } else {
                     val newTrack = Track(
                         box = RectF(candidate.box),
                         score = candidate.score
                     )
-                    tracks += newTrack
-                    touched += newTrack
+                    tracks.add(newTrack)
+                    touched.add(newTrack)
                 }
             }
 
@@ -68,11 +69,12 @@ class ObjectAgentEngine {
                 .map { Track(RectF(it.box), it.score, it.hits, it.misses, it.confirmed) }
         }
 
-        fun reset() = tracks.clear()
+        fun reset() {
+            tracks.clear()
+        }
 
         private fun smooth(previous: RectF, current: RectF): RectF {
-            // Joriy kadrga ko'proq og'irlik beriladi: ramka silliq, lekin kechikishi kam.
-            val oldWeight = 0.35f
+            val oldWeight = 0.45f
             val newWeight = 1f - oldWeight
             return RectF(
                 previous.left * oldWeight + current.left * newWeight,
@@ -82,12 +84,49 @@ class ObjectAgentEngine {
             )
         }
 
+        /**
+         * IoU alone tez harakatda trackni yo'qotishi mumkin.
+         * Shu sababli IoU va markazlar orasidagi masofa birgalikda baholanadi.
+         */
+        private fun associationQuality(a: RectF, b: RectF): Float {
+            val iou = intersectionOverUnion(a, b)
+            val acx = (a.left + a.right) * 0.5f
+            val acy = (a.top + a.bottom) * 0.5f
+            val bcx = (b.left + b.right) * 0.5f
+            val bcy = (b.top + b.bottom) * 0.5f
+            val distance = sqrt((acx - bcx) * (acx - bcx) + (acy - bcy) * (acy - bcy))
+            val diagonal = max(
+                sqrt(a.width() * a.width() + a.height() * a.height()),
+                sqrt(b.width() * b.width() + b.height() * b.height())
+            )
+            val allowedDistance = max(MIN_CENTER_DISTANCE_PX, diagonal * MAX_CENTER_DISTANCE_RATIO)
+            val proximity = if (allowedDistance > 0f) {
+                (1f - distance / allowedDistance).coerceIn(0f, 1f)
+            } else 0f
+            return max(iou, proximity * CENTER_ASSOCIATION_WEIGHT)
+        }
+
+        private fun intersectionOverUnion(a: RectF, b: RectF): Float {
+            val left = max(a.left, b.left)
+            val top = max(a.top, b.top)
+            val right = min(a.right, b.right)
+            val bottom = min(a.bottom, b.bottom)
+            val intersection = max(0f, right - left) * max(0f, bottom - top)
+            val areaA = max(0f, a.width()) * max(0f, a.height())
+            val areaB = max(0f, b.width()) * max(0f, b.height())
+            val union = areaA + areaB - intersection
+            return if (union > 0f) intersection / union else 0f
+        }
+
         companion object {
-            private const val MATCH_IOU = 0.12f
             private const val REQUIRED_HITS = 2
             private const val MAX_CONFIRMATION_HITS = 3
             private const val MAX_MISSED_FRAMES = 2
             private const val MAX_DISPLAY_HOLD_FRAMES = 1
+            private const val MIN_ASSOCIATION_QUALITY = 0.18f
+            private const val MIN_CENTER_DISTANCE_PX = 14f
+            private const val MAX_CENTER_DISTANCE_RATIO = 0.35f
+            private const val CENTER_ASSOCIATION_WEIGHT = 0.55f
         }
     }
 
@@ -102,18 +141,17 @@ class ObjectAgentEngine {
         detections.forEach { detection ->
             val category = detection.categories.maxByOrNull { it.score } ?: return@forEach
             val key = normalize(category.label)
-            val agent = agents[key] ?: return@forEach
-            if (category.score < thresholdFor(key)) return@forEach
+            if (key !in agents || category.score < thresholdFor(key)) return@forEach
 
             grouped.getOrPut(key) { mutableListOf() }
                 .add(Candidate(RectF(detection.boundingBox), category.score))
         }
 
-        return agents.mapNotNull { (label, agent) ->
-            val accepted = agent.update(grouped[label].orEmpty())
-            if (accepted.isEmpty()) null
-            else accepted.map { AgentDetection(RectF(it.box), label, it.score) }
-        }.flatten()
+        return agents.flatMap { (label, agent) ->
+            agent.update(grouped[label].orEmpty()).map {
+                AgentDetection(RectF(it.box), label, it.score)
+            }
+        }
     }
 
     @Synchronized
@@ -125,19 +163,8 @@ class ObjectAgentEngine {
         value.trim().lowercase().replace('_', ' ')
 
     private fun thresholdFor(label: String): Float = when (label) {
-        // O'xshash ko'rinishdagi mayda sinflarda yolg'on aniqlashni qattiqroq filtrlash.
         "remote", "mouse", "cell phone", "toothbrush", "hair drier", "scissors" -> 0.62f
         else -> 0.52f
-    }
-
-    private fun intersectionOverUnion(a: RectF, b: RectF): Float {
-        val left = max(a.left, b.left)
-        val top = max(a.top, b.top)
-        val right = min(a.right, b.right)
-        val bottom = min(a.bottom, b.bottom)
-        val intersection = max(0f, right - left) * max(0f, bottom - top)
-        val union = a.width() * a.height() + b.width() * b.height() - intersection
-        return if (union > 0f) intersection / union else 0f
     }
 
     companion object {
