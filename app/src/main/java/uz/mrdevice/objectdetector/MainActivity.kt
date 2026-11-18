@@ -89,6 +89,8 @@ class MainActivity : ComponentActivity() {
             textSize = 21f
             setTextColor(Color.rgb(20, 30, 48))
             gravity = Gravity.CENTER
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.bilmasvoy_logo, 0, 0, 0)
+            compoundDrawablePadding = 12
             setPadding(0, 5, 0, 8)
         }
 
