@@ -6,6 +6,8 @@
     <application
         android:allowBackup="false"
         android:label="Bilmasvoy"
+        android:icon="@drawable/bilmasvoy_logo"
+        android:roundIcon="@drawable/bilmasvoy_logo"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity

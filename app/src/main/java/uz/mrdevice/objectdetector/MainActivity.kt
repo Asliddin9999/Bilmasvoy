@@ -73,35 +73,91 @@ class MainActivity : ComponentActivity() {
 
     private fun buildInterface() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        val page = Color.rgb(8, 13, 24)
+        val surface = Color.rgb(17, 25, 41)
+        val surfaceRaised = Color.rgb(23, 34, 53)
+        val accent = Color.rgb(0, 220, 170)
+        val muted = Color.rgb(151, 166, 188)
+        val primary = Color.rgb(239, 245, 252)
+
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(14, 14, 14, 12)
-            setBackgroundColor(Color.rgb(247, 248, 250))
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setBackgroundColor(page)
+            clipToPadding = false
         }
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(14 + systemBars.left, 14 + systemBars.top, 14 + systemBars.right, 12 + systemBars.bottom)
+            view.setPadding(
+                dp(16) + systemBars.left,
+                dp(12) + systemBars.top,
+                dp(16) + systemBars.right,
+                dp(12) + systemBars.bottom
+            )
             insets
         }
 
-        val heading = TextView(this).apply {
-            text = "BILMASVOY"
-            textSize = 21f
-            setTextColor(Color.rgb(20, 30, 48))
-            gravity = Gravity.CENTER
-            setPadding(0, 5, 0, 8)
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(2), 0, dp(12))
         }
+        val logo = TextView(this).apply {
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.bilmasvoy_logo, 0, 0, 0)
+            compoundDrawablePadding = dp(10)
+            text = "BILMASVOY"
+            textSize = 20f
+            setTextColor(primary)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val version = TextView(this).apply {
+            text = "AI VISION"
+            textSize = 10f
+            letterSpacing = 0.12f
+            setTextColor(accent)
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            background = roundedBackground(surfaceRaised, 18f, accent, dp(1))
+        }
+        header.addView(logo, LinearLayout.LayoutParams(0, dp(42), 1f))
+        header.addView(version)
 
+        val statusCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(11), dp(14), dp(11))
+            background = roundedBackground(surface, 16f)
+        }
+        val statusDot = View(this).apply {
+            background = roundedBackground(accent, 20f)
+        }
+        statusCard.addView(statusDot, LinearLayout.LayoutParams(dp(8), dp(8)))
         status = TextView(this).apply {
             text = "Sun’iy intellekt modeli yuklanmoqda…"
-            textSize = 14f
-            setTextColor(Color.DKGRAY)
-            gravity = Gravity.CENTER
-            setPadding(4, 6, 4, 10)
+            textSize = 13f
+            setTextColor(primary)
+            setPadding(dp(10), 0, 0, 0)
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        statusCard.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
+
+        val cameraTitle = TextView(this).apply {
+            text = "JONLI KUZATUV"
+            textSize = 11f
+            letterSpacing = 0.12f
+            setTextColor(muted)
+            setPadding(dp(2), dp(14), dp(2), dp(7))
         }
 
+        val cameraCard = FrameLayout(this).apply {
+            background = roundedBackground(surface, 20f)
+            setPadding(dp(5), dp(5), dp(5), dp(5))
+            clipToOutline = true
+        }
         val cameraFrame = FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
+            background = roundedBackground(Color.BLACK, 15f)
+            clipToOutline = true
         }
         previewView = PreviewView(this).apply {
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
@@ -111,29 +167,107 @@ class MainActivity : ComponentActivity() {
         overlay = DetectionOverlay(this)
         cameraFrame.addView(previewView, FrameLayout.LayoutParams(-1, -1))
         cameraFrame.addView(overlay, FrameLayout.LayoutParams(-1, -1))
+        val liveLabel = TextView(this).apply {
+            text = "●  LIVE"
+            textSize = 10f
+            letterSpacing = 0.08f
+            setTextColor(Color.WHITE)
+            setPadding(dp(9), dp(6), dp(9), dp(6))
+            background = roundedBackground(Color.argb(185, 8, 18, 30), 18f)
+        }
+        cameraFrame.addView(liveLabel, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
+            setMargins(0, dp(10), dp(10), 0)
+        })
+        cameraCard.addView(cameraFrame, FrameLayout.LayoutParams(-1, -1))
 
-        count = TextView(this).apply {
-            text = "Aniqlangan narsalar: 0 ta"
-            textSize = 17f
-            setTextColor(Color.rgb(20, 30, 48))
+        val statsTitle = TextView(this).apply {
+            text = "ANIQLASH STATISTIKASI"
+            textSize = 11f
+            letterSpacing = 0.12f
+            setTextColor(muted)
+            setPadding(dp(2), dp(13), dp(2), dp(7))
+        }
+        val statsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val objectTile = createStatTile("TOPILDI", "0 ta", accent, surface)
+        count = objectTile.second
+        val modelTile = createStatTile("AI MODEL", "Lite2", primary, surface)
+        val classTile = createStatTile("SINFLAR", "80", primary, surface)
+        statsRow.addView(objectTile.first, LinearLayout.LayoutParams(0, dp(72), 1f).apply {
+            marginEnd = dp(7)
+        })
+        statsRow.addView(modelTile.first, LinearLayout.LayoutParams(0, dp(72), 1f).apply {
+            marginEnd = dp(7)
+        })
+        statsRow.addView(classTile.first, LinearLayout.LayoutParams(0, dp(72), 1f))
+
+        val footer = TextView(this).apply {
+            text = "Buyumni kamera ko‘rish maydoniga olib keling"
+            textSize = 11f
+            setTextColor(muted)
             gravity = Gravity.CENTER
-            setPadding(0, 10, 0, 8)
+            setPadding(0, dp(10), 0, dp(2))
         }
 
-        val explanation = TextView(this).apply {
-            text = "Kamera oldiga buyumlarni tuting. Dastur ularni suratga olmasdan, uzluksiz aniqlaydi."
-            textSize = 12f
-            setTextColor(Color.DKGRAY)
-            gravity = Gravity.CENTER
-            setPadding(8, 2, 8, 8)
-        }
-
-        root.addView(heading)
-        root.addView(status)
-        root.addView(cameraFrame, LinearLayout.LayoutParams(-1, 0, 1f))
-        root.addView(count)
-        root.addView(explanation)
+        root.addView(header, LinearLayout.LayoutParams(-1, -2))
+        root.addView(statusCard, LinearLayout.LayoutParams(-1, -2))
+        root.addView(cameraTitle, LinearLayout.LayoutParams(-1, -2))
+        root.addView(cameraCard, LinearLayout.LayoutParams(-1, 0, 1.35f))
+        root.addView(statsTitle, LinearLayout.LayoutParams(-1, -2))
+        root.addView(statsRow, LinearLayout.LayoutParams(-1, -2))
+        root.addView(footer, LinearLayout.LayoutParams(-1, -2))
         setContentView(root)
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun roundedBackground(
+        color: Int,
+        radiusDp: Float,
+        strokeColor: Int? = null,
+        strokeWidthPx: Int = 0
+    ): android.graphics.drawable.GradientDrawable {
+        return android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radiusDp.toInt()).toFloat()
+            if (strokeColor != null && strokeWidthPx > 0) {
+                setStroke(strokeWidthPx, strokeColor)
+            }
+        }
+    }
+
+    private fun createStatTile(
+        title: String,
+        value: String,
+        valueColor: Int,
+        backgroundColor: Int
+    ): Pair<LinearLayout, TextView> {
+        val tile = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(5), dp(7), dp(5), dp(7))
+            background = roundedBackground(backgroundColor, 15f)
+        }
+        val titleView = TextView(this).apply {
+            text = title
+            textSize = 9f
+            letterSpacing = 0.08f
+            setTextColor(Color.rgb(151, 166, 188))
+            gravity = Gravity.CENTER
+        }
+        val valueView = TextView(this).apply {
+            text = value
+            textSize = 18f
+            setTextColor(valueColor)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(3), 0, 0)
+        }
+        tile.addView(titleView, LinearLayout.LayoutParams(-1, -2))
+        tile.addView(valueView, LinearLayout.LayoutParams(-1, -2))
+        return tile to valueView
     }
 
     private fun loadDetectionModel() {
@@ -142,7 +276,7 @@ class MainActivity : ComponentActivity() {
             try {
                 val options = ObjectDetector.ObjectDetectorOptions.builder()
                     .setScoreThreshold(0.20f)
-                    .setMaxResults(50)
+                    .setMaxResults(30)
                     .build()
 
                 loadedModel = ObjectDetector.createFromFileAndOptions(
@@ -279,7 +413,7 @@ class MainActivity : ComponentActivity() {
             runOnUiThread {
                 if (frameGeneration == cameraGeneration && screenIsActive && cameraStarted && !isFinishing && !isDestroyed) {
                     overlay.showDetections(sourceWidth, sourceHeight, detections)
-                    count.text = "Aniqlangan narsalar: ${detections.size} ta"
+                    count.text = detections.size.toString()
                     status.text = if (detections.isEmpty()) {
                         "Hozircha narsa topilmadi. Buyumni kameraga yaqinroq tuting."
                     } else {
@@ -395,7 +529,7 @@ class MainActivity : ComponentActivity() {
         cameraProvider?.unbindAll()
         objectAgentEngine.reset()
         if (::overlay.isInitialized) overlay.clearDetections()
-        if (::count.isInitialized) count.text = "Aniqlangan narsalar: 0 ta"
+        if (::count.isInitialized) count.text = "0"
     }
 
     override fun onResume() {
