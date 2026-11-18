@@ -51,8 +51,7 @@ class MainActivity : ComponentActivity() {
     @Volatile private var cameraStarted = false
     @Volatile private var cameraStarting = false
     @Volatile private var cameraGeneration = 0
-    private var previousDetections: List<Pair<RectF, String>> = emptyList()
-    private var missedDetectionFrames = 0
+    private val recentDetectionFrames = mutableListOf<List<Pair<RectF, String>>>()
 
     private val cameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -142,8 +141,8 @@ class MainActivity : ComponentActivity() {
             var loadedModel: ObjectDetector? = null
             try {
                 val options = ObjectDetector.ObjectDetectorOptions.builder()
-                    .setScoreThreshold(0.35f)
-                    .setMaxResults(100)
+                    .setScoreThreshold(0.60f)
+                    .setMaxResults(30)
                     .build()
 
                 loadedModel = ObjectDetector.createFromFileAndOptions(
@@ -267,7 +266,7 @@ class MainActivity : ComponentActivity() {
                 originalBitmap = null
             }
 
-            val detections = stabilizeDetections(detectTiled(orientedBitmap, activeDetector))
+            val detections = stabilizeDetections(convertDetections(activeDetector.detect(TensorImage.fromBitmap(orientedBitmap))))
             val sourceWidth = orientedBitmap.width
             val sourceHeight = orientedBitmap.height
 
@@ -297,82 +296,34 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Kadrlar orasida bir xil narsani moslab, ramkani silliqlaydi va qisqa yo‘qolishlarda saqlab turadi.
-    // Tasvirni ustma-ust tushadigan 4 hududga bo'lib tekshiradi.
-    // Kichik va uzoqdagi buyumlarni alohida hududda aniqlashga yordam beradi.
-    private fun detectTiled(bitmap: Bitmap, activeDetector: ObjectDetector): List<Pair<RectF, String>> {
-        val width = bitmap.width
-        val height = bitmap.height
-        val tileWidth = (width * 0.60f).toInt().coerceAtLeast(1)
-        val tileHeight = (height * 0.60f).toInt().coerceAtLeast(1)
-        val lefts = listOf(0, (width - tileWidth).coerceAtLeast(0)).distinct()
-        val tops = listOf(0, (height - tileHeight).coerceAtLeast(0)).distinct()
-        val candidates = mutableListOf<Pair<RectF, String>>()
-        for (top in tops) {
-            for (left in lefts) {
-                val cropWidth = minOf(tileWidth, width - left)
-                val cropHeight = minOf(tileHeight, height - top)
-                if (cropWidth <= 0 || cropHeight <= 0) continue
-                val crop = Bitmap.createBitmap(bitmap, left, top, cropWidth, cropHeight)
-                try {
-                    val tileDetections = activeDetector.detect(TensorImage.fromBitmap(crop))
-                    convertDetections(tileDetections).forEach { (box, label) ->
-                        val mapped = RectF(box).apply { offset(left.toFloat(), top.toFloat()) }
-                        candidates.add(mapped to label)
-                    }
-                } finally {
-                    if (!crop.isRecycled) crop.recycle()
-                }
-            }
-        }
-        val sorted = candidates.sortedByDescending { (_, label) ->
-            label.substringAfterLast(" — ").removeSuffix("%").toFloatOrNull() ?: 0f
-        }
-        val unique = mutableListOf<Pair<RectF, String>>()
-        for (candidate in sorted) {
-            val className = candidate.second.substringBefore(" — ")
-            val duplicate = unique.any { existing ->
-                existing.second.substringBefore(" — ") == className &&
-                    intersectionOverUnion(candidate.first, existing.first) >= 0.50f
-            }
-            if (!duplicate) unique.add(candidate)
-            if (unique.size >= 100) break
-        }
-        return unique
-    }
-
+    // Soxta bir martalik aniqlashlarni ko'rsatmaydi: obyekt kamida 2 ta ketma-ket kadrda tasdiqlanishi kerak.
+    // Kadrda yo'qolgan obyekt darhol o'chiriladi; eski ramkalar ekranda qolmaydi.
     private fun stabilizeDetections(current: List<Pair<RectF, String>>): List<Pair<RectF, String>> {
-        if (current.isEmpty()) {
-            missedDetectionFrames++
-            if (missedDetectionFrames <= 2) return previousDetections
-            previousDetections = emptyList()
-            return emptyList()
-        }
-
-        missedDetectionFrames = 0
-        val unmatchedPrevious = previousDetections.toMutableList()
-        val stabilized = current.map { (box, label) ->
+        val previousFrames = recentDetectionFrames.toList()
+        val confirmed = current.mapNotNull { (box, label) ->
             val className = label.substringBefore(" — ")
-            val matchIndex = unmatchedPrevious.indices
-                .filter { unmatchedPrevious[it].second.substringBefore(" — ") == className }
-                .maxByOrNull { index -> intersectionOverUnion(box, unmatchedPrevious[index].first) }
-                ?.takeIf { intersectionOverUnion(box, unmatchedPrevious[it].first) >= 0.20f }
-
-            if (matchIndex == null) {
-                box to label
+            val matches = previousFrames.mapNotNull { frame ->
+                frame.filter { old ->
+                    old.second.substringBefore(" — ") == className &&
+                        intersectionOverUnion(box, old.first) >= 0.25f
+                }.maxByOrNull { intersectionOverUnion(box, it.first) }
+            }
+            val bestMatch = matches.maxByOrNull { intersectionOverUnion(box, it.first) }
+            if (bestMatch == null) {
+                null
             } else {
-                val old = unmatchedPrevious.removeAt(matchIndex).first
-                val smooth = RectF(
-                    old.left * 0.65f + box.left * 0.35f,
-                    old.top * 0.65f + box.top * 0.35f,
-                    old.right * 0.65f + box.right * 0.35f,
-                    old.bottom * 0.65f + box.bottom * 0.35f
-                )
-                smooth to label
+                val old = bestMatch.first
+                RectF(
+                    old.left * 0.35f + box.left * 0.65f,
+                    old.top * 0.35f + box.top * 0.65f,
+                    old.right * 0.35f + box.right * 0.65f,
+                    old.bottom * 0.35f + box.bottom * 0.65f
+                ) to label
             }
         }
-        previousDetections = stabilized
-        return stabilized
+        recentDetectionFrames.add(current.map { (box, label) -> RectF(box) to label })
+        while (recentDetectionFrames.size > 2) recentDetectionFrames.removeAt(0)
+        return confirmed
     }
 
     private fun intersectionOverUnion(a: RectF, b: RectF): Float {
@@ -484,8 +435,7 @@ class MainActivity : ComponentActivity() {
         cameraStarted = false
         cameraStarting = false
         cameraProvider?.unbindAll()
-        previousDetections = emptyList()
-        missedDetectionFrames = 0
+        recentDetectionFrames.clear()
         if (::overlay.isInitialized) overlay.clearDetections()
         if (::count.isInitialized) count.text = "Aniqlangan narsalar: 0 ta"
     }
