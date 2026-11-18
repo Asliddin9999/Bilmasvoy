@@ -10,7 +10,6 @@ on:
 permissions:
   contents: write
 
-# Bir branch uchun faqat eng oxirgi yig‘ish jarayoni ishlaydi.
 concurrency:
   group: bilmasvoy-${{ github.ref }}
   cancel-in-progress: true
@@ -63,13 +62,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Send APK to Telegram once per version
+      - name: Send APK to Telegram once per delivery
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.MrDeviceUZ_SenaristBotbilmasvoy }}
           TELEGRAM_PRIVATE_CHAT_ID: '1888242683'
           TELEGRAM_AGENTLAR_CHAT_ID: '156721188'
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           VERSION=$(sed -n 's/^[[:space:]]*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)
@@ -77,9 +75,9 @@ jobs:
             echo "::error::Could not read app version."
             exit 1
           fi
-          TAG="bilmasvoy-v${VERSION}"
+          TAG="bilmasvoy-v${VERSION}-resend"
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "Version $VERSION was already delivered. Skipping duplicate Telegram send."
+            echo "Delivery $TAG already exists. Skipping duplicate Telegram send."
             exit 0
           fi
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_PRIVATE_CHAT_ID" ] || [ -z "$TELEGRAM_AGENTLAR_CHAT_ID" ]; then
@@ -87,7 +85,7 @@ jobs:
             exit 1
           fi
 
-          CAPTION="Bilmasvoy ${VERSION} — yangi APK yangilanishi. 80 ta COCO sinfi uchun mahalliy AI agentlari, barqaror ramka kuzatuvi."
+          CAPTION="Bilmasvoy ${VERSION} — yangi APK yangilanishi. Dark Premium interfeys va barqaror AI obyekt kuzatuvi."
           for CHAT_ID in "$TELEGRAM_PRIVATE_CHAT_ID" "$TELEGRAM_AGENTLAR_CHAT_ID"; do
             response=$(curl --fail --show-error --silent \
               --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
