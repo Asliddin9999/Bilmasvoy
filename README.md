@@ -1,11 +1,12 @@
-# Bilmasvoy — aqlli obyekt aniqlash ilovasi
+# Bilmasvoy — 80 agentli aqlli obyekt aniqlash ilovasi
 
-Bilmasvoy Android dasturi TensorFlow Lite EfficientDet-Lite0 modeli bilan 80 ta COCO obyekt sinfini telefonning o‘zida taniydi.
+Bilmasvoy EfficientDet-Lite2 AI modelini telefonning o'zida ishga tushiradi. Model 80 ta COCO obyekt sinfini aniqlaydi; ilova ichidagi 80 ta yengil sinf-agent esa har bir obyekt turini alohida tekshiradi va kuzatadi.
 
-- Ilova ochilganda kamera ruxsatini so‘raydi.
-- Ruxsat berilgach orqa kamera avtomatik ishga tushadi.
-- Jonli tasvirda obyekt ramkasi, o‘zbekcha nomi va ishonchlilik foizi ko‘rsatiladi.
-- Model ilovaga qo‘shilgach, aniqlash offline ishlaydi.
-- Galereyadan rasm tanlash funksiyasi yo‘q.
+- AI model va agentlar telefon ichida ishlaydi; aniqlash uchun internet talab qilinmaydi.
+- Har bir agent faqat o'z obyekt sinfiga tegishli natijalarni qabul qiladi.
+- Obyekt kamida ikki kadrda tasdiqlangach ramka ko'rsatiladi.
+- Ramka kadrlar orasida silliqlanadi, yo'qolgan obyekt uchun esa qisqa muddatdan ortiq saqlanmaydi.
+- Obyekt nomi o'zbek tilida va ishonchlilik foizi bilan ko'rsatiladi.
+- Hozirgi model COCO ma'lumotlar to'plamidagi 80 ta sinfni taniydi; istalgan yangi buyumni tanish uchun maxsus o'qitilgan model kerak.
 
-APK GitHub Actions orqali yig‘iladi. Telegramga yuborish uchun `TELEGRAM_BOT_TOKEN` va `TELEGRAM_CHAT_ID` Actions secrets sifatida sozlanishi kerak. Botga oldin `/start` yuboring. Tokenni chatga yubormang.
+APK GitHub Actions orqali yig'iladi va sozlangan Telegram chatiga yuboriladi.
