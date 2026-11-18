@@ -64,11 +64,11 @@ jobs:
           retention-days: 14
 
       - name: Send APK to Telegram once per version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/feature/'))
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.MrDeviceUZ_SenaristBotbilmasvoy }}
           TELEGRAM_PRIVATE_CHAT_ID: '1888242683'
-          TELEGRAM_AGENTLAR_CHAT_ID: '-1004305554564'
+          TELEGRAM_AGENTLAR_CHAT_ID: '156721188'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
