@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
     @Volatile private var cameraStarted = false
     @Volatile private var cameraStarting = false
     @Volatile private var cameraGeneration = 0
-    private val recentDetectionFrames = mutableListOf<List<Pair<RectF, String>>>()
+    private val objectAgentEngine = ObjectAgentEngine()
 
     private val cameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -141,8 +141,8 @@ class MainActivity : ComponentActivity() {
             var loadedModel: ObjectDetector? = null
             try {
                 val options = ObjectDetector.ObjectDetectorOptions.builder()
-                    .setScoreThreshold(0.60f)
-                    .setMaxResults(30)
+                    .setScoreThreshold(0.20f)
+                    .setMaxResults(50)
                     .build()
 
                 loadedModel = ObjectDetector.createFromFileAndOptions(
@@ -266,7 +266,8 @@ class MainActivity : ComponentActivity() {
                 originalBitmap = null
             }
 
-            val detections = stabilizeDetections(convertDetections(activeDetector.detect(TensorImage.fromBitmap(orientedBitmap))))
+            val detections = objectAgentEngine.update(activeDetector.detect(TensorImage.fromBitmap(orientedBitmap)))
+                .map { it.boundingBox to "${uzbekObjectName(it.label)} — ${(it.score * 100).toInt()}%" }
             val sourceWidth = orientedBitmap.width
             val sourceHeight = orientedBitmap.height
 
@@ -293,54 +294,6 @@ class MainActivity : ComponentActivity() {
             }
             if (originalBitmap != null && !originalBitmap.isRecycled) originalBitmap.recycle()
             imageProxy.close()
-        }
-    }
-
-    // Soxta bir martalik aniqlashlarni ko'rsatmaydi: obyekt kamida 2 ta ketma-ket kadrda tasdiqlanishi kerak.
-    // Kadrda yo'qolgan obyekt darhol o'chiriladi; eski ramkalar ekranda qolmaydi.
-    private fun stabilizeDetections(current: List<Pair<RectF, String>>): List<Pair<RectF, String>> {
-        val previousFrames = recentDetectionFrames.toList()
-        val confirmed = current.mapNotNull { (box, label) ->
-            val className = label.substringBefore(" — ")
-            val matches = previousFrames.mapNotNull { frame ->
-                frame.filter { old ->
-                    old.second.substringBefore(" — ") == className &&
-                        intersectionOverUnion(box, old.first) >= 0.25f
-                }.maxByOrNull { intersectionOverUnion(box, it.first) }
-            }
-            val bestMatch = matches.maxByOrNull { intersectionOverUnion(box, it.first) }
-            if (bestMatch == null) {
-                null
-            } else {
-                val old = bestMatch.first
-                RectF(
-                    old.left * 0.35f + box.left * 0.65f,
-                    old.top * 0.35f + box.top * 0.65f,
-                    old.right * 0.35f + box.right * 0.65f,
-                    old.bottom * 0.35f + box.bottom * 0.65f
-                ) to label
-            }
-        }
-        recentDetectionFrames.add(current.map { (box, label) -> RectF(box) to label })
-        while (recentDetectionFrames.size > 2) recentDetectionFrames.removeAt(0)
-        return confirmed
-    }
-
-    private fun intersectionOverUnion(a: RectF, b: RectF): Float {
-        val left = max(a.left, b.left)
-        val top = max(a.top, b.top)
-        val right = minOf(a.right, b.right)
-        val bottom = minOf(a.bottom, b.bottom)
-        val intersection = max(0f, right - left) * max(0f, bottom - top)
-        val union = a.width() * a.height() + b.width() * b.height() - intersection
-        return if (union > 0f) intersection / union else 0f
-    }
-
-    private fun convertDetections(results: List<Detection>): List<Pair<RectF, String>> {
-        return results.mapNotNull { detection ->
-            val category = detection.categories.maxByOrNull { it.score } ?: return@mapNotNull null
-            val uzbekName = uzbekObjectName(category.label)
-            detection.boundingBox to "$uzbekName — ${(category.score * 100).toInt()}%"
         }
     }
 
@@ -435,7 +388,7 @@ class MainActivity : ComponentActivity() {
         cameraStarted = false
         cameraStarting = false
         cameraProvider?.unbindAll()
-        recentDetectionFrames.clear()
+        objectAgentEngine.reset()
         if (::overlay.isInitialized) overlay.clearDetections()
         if (::count.isInitialized) count.text = "Aniqlangan narsalar: 0 ta"
     }
