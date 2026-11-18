@@ -267,8 +267,7 @@ class MainActivity : ComponentActivity() {
                 originalBitmap = null
             }
 
-            val results = activeDetector.detect(TensorImage.fromBitmap(orientedBitmap))
-            val detections = stabilizeDetections(convertDetections(results))
+            val detections = stabilizeDetections(detectTiled(orientedBitmap, activeDetector))
             val sourceWidth = orientedBitmap.width
             val sourceHeight = orientedBitmap.height
 
@@ -299,6 +298,49 @@ class MainActivity : ComponentActivity() {
     }
 
     // Kadrlar orasida bir xil narsani moslab, ramkani silliqlaydi va qisqa yo‘qolishlarda saqlab turadi.
+    // Tasvirni ustma-ust tushadigan 4 hududga bo'lib tekshiradi.
+    // Kichik va uzoqdagi buyumlarni alohida hududda aniqlashga yordam beradi.
+    private fun detectTiled(bitmap: Bitmap, activeDetector: ObjectDetector): List<Pair<RectF, String>> {
+        val width = bitmap.width
+        val height = bitmap.height
+        val tileWidth = (width * 0.60f).toInt().coerceAtLeast(1)
+        val tileHeight = (height * 0.60f).toInt().coerceAtLeast(1)
+        val lefts = listOf(0, (width - tileWidth).coerceAtLeast(0)).distinct()
+        val tops = listOf(0, (height - tileHeight).coerceAtLeast(0)).distinct()
+        val candidates = mutableListOf<Pair<RectF, String>>()
+        for (top in tops) {
+            for (left in lefts) {
+                val cropWidth = minOf(tileWidth, width - left)
+                val cropHeight = minOf(tileHeight, height - top)
+                if (cropWidth <= 0 || cropHeight <= 0) continue
+                val crop = Bitmap.createBitmap(bitmap, left, top, cropWidth, cropHeight)
+                try {
+                    val tileDetections = activeDetector.detect(TensorImage.fromBitmap(crop))
+                    convertDetections(tileDetections).forEach { (box, label) ->
+                        val mapped = RectF(box).apply { offset(left.toFloat(), top.toFloat()) }
+                        candidates.add(mapped to label)
+                    }
+                } finally {
+                    if (!crop.isRecycled) crop.recycle()
+                }
+            }
+        }
+        val sorted = candidates.sortedByDescending { (_, label) ->
+            label.substringAfterLast(" — ").removeSuffix("%").toFloatOrNull() ?: 0f
+        }
+        val unique = mutableListOf<Pair<RectF, String>>()
+        for (candidate in sorted) {
+            val className = candidate.second.substringBefore(" — ")
+            val duplicate = unique.any { existing ->
+                existing.second.substringBefore(" — ") == className &&
+                    intersectionOverUnion(candidate.first, existing.first) >= 0.50f
+            }
+            if (!duplicate) unique.add(candidate)
+            if (unique.size >= 100) break
+        }
+        return unique
+    }
+
     private fun stabilizeDetections(current: List<Pair<RectF, String>>): List<Pair<RectF, String>> {
         if (current.isEmpty()) {
             missedDetectionFrames++
