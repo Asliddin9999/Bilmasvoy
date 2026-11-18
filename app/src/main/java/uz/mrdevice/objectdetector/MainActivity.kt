@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
         cameraFrame.addView(overlay, FrameLayout.LayoutParams(-1, -1))
 
         count = TextView(this).apply {
-            text = "Aniqlangan obyektlar: 0 ta"
+            text = "Aniqlangan narsalar: 0 ta"
             textSize = 17f
             setTextColor(Color.rgb(20, 30, 48))
             gravity = Gravity.CENTER
@@ -169,7 +169,7 @@ class MainActivity : ComponentActivity() {
             } catch (error: Exception) {
                 runOnUiThread {
                     if (screenIsActive && !isFinishing && !isDestroyed) {
-                        status.text = "Modelni yuklashda xatolik. Internet yoki model faylini tekshirish kerak."
+                        status.text = "Sun’iy intellekt modelini yuklab bo‘lmadi. Ilovani qayta ishga tushiring."
                     }
                 }
             } finally {
@@ -273,11 +273,11 @@ class MainActivity : ComponentActivity() {
             runOnUiThread {
                 if (screenIsActive && cameraStarted && !isFinishing && !isDestroyed) {
                     overlay.showDetections(sourceWidth, sourceHeight, detections)
-                    count.text = "Aniqlangan obyektlar: ${detections.size} ta"
+                    count.text = "Aniqlangan narsalar: ${detections.size} ta"
                     status.text = if (detections.isEmpty()) {
-                        "Hozircha obyekt aniqlanmadi. Buyumni kameraga yaqinroq tuting."
+                        "Hozircha narsa topilmadi. Buyumni kameraga yaqinroq tuting."
                     } else {
-                        "Aniqlash faol — ${detections.size} ta obyekt topildi."
+                        "Aniqlash faol — ${detections.size} ta narsa topildi."
                     }
                 }
             }
@@ -330,20 +330,20 @@ class MainActivity : ComponentActivity() {
             "bear" -> "Ayiq"
             "zebra" -> "Zebra"
             "giraffe" -> "Jirafa"
-            "backpack" -> "Ryukzak"
+            "backpack" -> "Orqa xalta"
             "umbrella" -> "Soyabon"
             "handbag" -> "Qo‘l sumkasi"
             "tie" -> "Bo‘yinbog‘"
             "suitcase" -> "Chamadon"
             "frisbee" -> "Uchar likopcha"
             "skis" -> "Chang‘i"
-            "snowboard" -> "Snoubord"
+            "snowboard" -> "Qor taxtasi"
             "sports ball" -> "Sport to‘pi"
             "kite" -> "Varrak"
             "baseball bat" -> "Beysbol tayoqchasi"
             "baseball glove" -> "Beysbol qo‘lqopi"
-            "skateboard" -> "Skeytbord"
-            "surfboard" -> "Serfing taxtasi"
+            "skateboard" -> "G‘ildirakli taxta"
+            "surfboard" -> "To‘lqin taxtasi"
             "tennis racket" -> "Tennis raketkasi"
             "bottle" -> "Butilka"
             "wine glass" -> "Qadah"
@@ -354,11 +354,11 @@ class MainActivity : ComponentActivity() {
             "bowl" -> "Kosa"
             "banana" -> "Banan"
             "apple" -> "Olma"
-            "sandwich" -> "Sendvich"
+            "sandwich" -> "Non orasidagi yegulik"
             "orange" -> "Apelsin"
             "broccoli" -> "Brokkoli"
             "carrot" -> "Sabzi"
-            "hot dog" -> "Xot-dog"
+            "hot dog" -> "Kolbasali non"
             "pizza" -> "Pitsa"
             "donut" -> "Ponchik"
             "cake" -> "Tort"
@@ -369,24 +369,24 @@ class MainActivity : ComponentActivity() {
             "dining table" -> "Ovqatlanish stoli"
             "toilet" -> "Hojatxona"
             "tv" -> "Televizor"
-            "laptop" -> "Noutbuk"
+            "laptop" -> "Ko‘chma kompyuter"
             "mouse" -> "Sichqoncha"
             "remote" -> "Masofadan boshqarish pulti"
             "keyboard" -> "Klaviatura"
-            "cell phone" -> "Uyali telefon"
+            "cell phone" -> "Qo‘l telefoni"
             "microwave" -> "Mikroto‘lqinli pech"
-            "oven" -> "Duxovka"
+            "oven" -> "Pishirish pechi"
             "toaster" -> "Non qizartirgich"
-            "sink" -> "Rakvina"
+            "sink" -> "Yuvinish chig‘anog‘i"
             "refrigerator" -> "Muzlatkich"
             "book" -> "Kitob"
             "clock" -> "Soat"
             "vase" -> "Guldon"
             "scissors" -> "Qaychi"
-            "teddy bear" -> "O‘yinchoq ayiq"
+            "teddy bear" -> "Ayiqcha o‘yinchoq"
             "hair drier" -> "Soch quritgich"
             "toothbrush" -> "Tish cho‘tkasi"
-            else -> label.replaceFirstChar { it.uppercase() }
+            else -> "Noma’lum narsa"
         }
     }
 
@@ -396,7 +396,7 @@ class MainActivity : ComponentActivity() {
         cameraStarting = false
         cameraProvider?.unbindAll()
         if (::overlay.isInitialized) overlay.clearDetections()
-        if (::count.isInitialized) count.text = "Aniqlangan obyektlar: 0 ta"
+        if (::count.isInitialized) count.text = "Aniqlangan narsalar: 0 ta"
     }
 
     override fun onResume() {
