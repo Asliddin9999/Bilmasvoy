@@ -64,7 +64,8 @@ jobs:
       - name: Send APK to Telegram once per version
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.MrDeviceUZ_SenaristBotbilmasvoy }}
-          TELEGRAM_CHAT_ID: '1888242683'
+          TELEGRAM_PRIVATE_CHAT_ID: '1888242683'
+          TELEGRAM_AGENTLAR_CHAT_ID: '-1004305554564'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -78,16 +79,22 @@ jobs:
             echo "Version $VERSION was already delivered. Skipping duplicate Telegram send."
             exit 0
           fi
-          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-            echo "::error::Telegram secrets are missing."
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_PRIVATE_CHAT_ID" ] || [ -z "$TELEGRAM_AGENTLAR_CHAT_ID" ]; then
+            echo "::error::Telegram bot token or chat IDs are missing."
             exit 1
           fi
-          response=$(curl --fail --show-error --silent \
-            --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-            --form "chat_id=${TELEGRAM_CHAT_ID}" \
-            --form "document=@app/build/outputs/apk/debug/app-debug.apk" \
-            --form "caption=Bilmasvoy ${VERSION} — o‘zbekcha interfeys va 80 turdagi narsani aniqlash")
-          echo "$response" | jq -e '.ok == true' >/dev/null
+
+          CAPTION="Bilmasvoy ${VERSION} — yangi APK yangilanishi. 80 ta COCO sinfi uchun mahalliy AI agentlari, barqaror ramka kuzatuvi."
+          for CHAT_ID in "$TELEGRAM_PRIVATE_CHAT_ID" "$TELEGRAM_AGENTLAR_CHAT_ID"; do
+            response=$(curl --fail --show-error --silent \
+              --request POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+              --form "chat_id=${CHAT_ID}" \
+              --form "document=@app/build/outputs/apk/debug/app-debug.apk" \
+              --form "caption=${CAPTION}")
+            echo "$response" | jq -e '.ok == true' >/dev/null
+            echo "Telegram confirmed delivery to chat ${CHAT_ID}."
+          done
+
           git tag "$TAG" "$GITHUB_SHA"
           git push origin "refs/tags/$TAG"
-          echo "Telegram confirmed the one-time delivery of version $VERSION."
+          echo "Telegram confirmed delivery of version $VERSION to both chats."
