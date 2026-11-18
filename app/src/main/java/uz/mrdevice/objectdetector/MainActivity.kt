@@ -142,7 +142,7 @@ class MainActivity : ComponentActivity() {
             try {
                 val options = ObjectDetector.ObjectDetectorOptions.builder()
                     .setScoreThreshold(0.20f)
-                    .setMaxResults(50)
+                    .setMaxResults(30)
                     .build()
 
                 loadedModel = ObjectDetector.createFromFileAndOptions(
