@@ -142,13 +142,13 @@ class MainActivity : ComponentActivity() {
             var loadedModel: ObjectDetector? = null
             try {
                 val options = ObjectDetector.ObjectDetectorOptions.builder()
-                    .setScoreThreshold(0.25f)
-                    .setMaxResults(30)
+                    .setScoreThreshold(0.35f)
+                    .setMaxResults(100)
                     .build()
 
                 loadedModel = ObjectDetector.createFromFileAndOptions(
                     this,
-                    "efficientdet-lite0.tflite",
+                    "efficientdet-lite2.tflite",
                     options
                 )
 
