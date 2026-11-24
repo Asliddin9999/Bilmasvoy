@@ -89,6 +89,8 @@ class MainActivity : ComponentActivity() {
             textSize = 21f
             setTextColor(Color.rgb(20, 30, 48))
             gravity = Gravity.CENTER
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.bilmasvoy_logo, 0, 0, 0)
+            compoundDrawablePadding = 12
             setPadding(0, 5, 0, 8)
         }
 
@@ -142,7 +144,7 @@ class MainActivity : ComponentActivity() {
             try {
                 val options = ObjectDetector.ObjectDetectorOptions.builder()
                     .setScoreThreshold(0.20f)
-                    .setMaxResults(50)
+                    .setMaxResults(30)
                     .build()
 
                 loadedModel = ObjectDetector.createFromFileAndOptions(

@@ -24,7 +24,8 @@ class ObjectAgentEngine {
         var score: Float,
         var hits: Int = 1,
         var misses: Int = 0,
-        var confirmed: Boolean = false
+        var confirmed: Boolean = false,
+        val velocity: RectF = RectF(0f, 0f, 0f, 0f)
     )
 
     private class ObjectAgent {
@@ -36,14 +37,17 @@ class ObjectAgentEngine {
             candidates.sortedByDescending { it.score }.forEach { candidate ->
                 val match = tracks.asSequence()
                     .filter { it !in touched }
-                    .map { track -> track to associationQuality(track.box, candidate.box) }
+                    .map { track -> track to associationQuality(predictedBox(track), candidate.box) }
                     .filter { it.second >= MIN_ASSOCIATION_QUALITY }
                     .maxByOrNull { it.second }
                     ?.first
 
                 if (match != null) {
-                    // EMA: koordinata tebranishini yumshatadi, lekin harakatga tez moslashadi.
-                    match.box = smooth(match.box, candidate.box)
+                    // Tezlik prognozi kadrlar orasidagi kichik uzilishlarda obyektni yo‘qotmaslikka yordam beradi.
+                    val previousBox = RectF(match.box)
+                    val predicted = predictedBox(match)
+                    updateVelocity(match.velocity, previousBox, candidate.box)
+                    match.box = smooth(predicted, candidate.box)
                     match.score = match.score * 0.35f + candidate.score * 0.65f
                     match.hits = min(MAX_CONFIRMATION_HITS, match.hits + 1)
                     match.misses = 0
@@ -59,7 +63,16 @@ class ObjectAgentEngine {
                 }
             }
 
-            tracks.filter { it !in touched }.forEach { it.misses++ }
+            tracks.filter { it !in touched }.forEach { track ->
+                track.misses++
+                if (track.misses <= MAX_DISPLAY_HOLD_FRAMES) {
+                    track.box.offset(
+                        track.velocity.left * PREDICTION_DECAY,
+                        track.velocity.top * PREDICTION_DECAY
+                    )
+                    dampVelocity(track.velocity)
+                }
+            }
             tracks.removeAll { it.misses > MAX_MISSED_FRAMES }
 
             return tracks
@@ -72,13 +85,44 @@ class ObjectAgentEngine {
         }
 
         private fun smooth(previous: RectF, current: RectF): RectF {
-            val oldWeight = 0.45f
-            val newWeight = 1f - oldWeight
+            val dx = ((current.left + current.right) - (previous.left + previous.right)) * 0.5f
+            val dy = ((current.top + current.bottom) - (previous.top + previous.bottom)) * 0.5f
+            val diagonal = max(
+                sqrt(previous.width() * previous.width() + previous.height() * previous.height()),
+                sqrt(current.width() * current.width() + current.height() * current.height())
+            ).coerceAtLeast(1f)
+            // Kichik tebranishlarda kuchliroq yumshatish, tez harakatda esa kechikishni kamaytirish.
+            val movementRatio = sqrt(dx * dx + dy * dy) / diagonal
+            val newWeight = if (movementRatio > FAST_MOVEMENT_RATIO) FAST_MOVEMENT_WEIGHT else NORMAL_MOVEMENT_WEIGHT
+            val oldWeight = 1f - newWeight
             return RectF(
                 previous.left * oldWeight + current.left * newWeight,
                 previous.top * oldWeight + current.top * newWeight,
                 previous.right * oldWeight + current.right * newWeight,
                 previous.bottom * oldWeight + current.bottom * newWeight
+            )
+        }
+
+        private fun predictedBox(track: Track): RectF = RectF(track.box).apply {
+            offset(track.velocity.left * PREDICTION_LOOKAHEAD, track.velocity.top * PREDICTION_LOOKAHEAD)
+        }
+
+        private fun updateVelocity(velocity: RectF, previous: RectF, current: RectF) {
+            val alpha = VELOCITY_SMOOTHING
+            velocity.set(
+                velocity.left * (1f - alpha) + (current.left - previous.left) * alpha,
+                velocity.top * (1f - alpha) + (current.top - previous.top) * alpha,
+                velocity.right * (1f - alpha) + (current.right - previous.right) * alpha,
+                velocity.bottom * (1f - alpha) + (current.bottom - previous.bottom) * alpha
+            )
+        }
+
+        private fun dampVelocity(velocity: RectF) {
+            velocity.set(
+                velocity.left * VELOCITY_DAMPING,
+                velocity.top * VELOCITY_DAMPING,
+                velocity.right * VELOCITY_DAMPING,
+                velocity.bottom * VELOCITY_DAMPING
             )
         }
 
@@ -120,7 +164,14 @@ class ObjectAgentEngine {
             private const val REQUIRED_HITS = 2
             private const val MAX_CONFIRMATION_HITS = 3
             private const val MAX_MISSED_FRAMES = 2
-            private const val MAX_DISPLAY_HOLD_FRAMES = 1
+            private const val MAX_DISPLAY_HOLD_FRAMES = 2
+            private const val PREDICTION_LOOKAHEAD = 0.80f
+            private const val PREDICTION_DECAY = 0.75f
+            private const val VELOCITY_SMOOTHING = 0.45f
+            private const val VELOCITY_DAMPING = 0.65f
+            private const val FAST_MOVEMENT_RATIO = 0.22f
+            private const val NORMAL_MOVEMENT_WEIGHT = 0.42f
+            private const val FAST_MOVEMENT_WEIGHT = 0.72f
             private const val MIN_ASSOCIATION_QUALITY = 0.18f
             private const val MIN_CENTER_DISTANCE_PX = 14f
             private const val MAX_CENTER_DISTANCE_RATIO = 0.35f
@@ -162,7 +213,7 @@ class ObjectAgentEngine {
 
     private fun thresholdFor(label: String): Float = when (label) {
         "remote", "mouse", "cell phone", "toothbrush", "hair drier", "scissors" -> 0.62f
-        else -> 0.52f
+        else -> 0.60f
     }
 
     companion object {

@@ -6,15 +6,13 @@ plugins {
 android {
     namespace = "uz.mrdevice.objectdetector"
     compileSdk = 35
-
     defaultConfig {
         applicationId = "uz.mrdevice.objectdetector"
         minSdk = 24
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 10
+        versionName = "1.9"
     }
-
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -27,7 +25,6 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 }
-
 dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("androidx.core:core-ktx:1.15.0")
